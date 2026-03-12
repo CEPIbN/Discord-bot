@@ -12,6 +12,7 @@ load_dotenv()
 #Ссылки на гифки
 TARGET_GIF_URL = os.getenv("TARGET_GIF_URL")
 SKIP_GIF = os.getenv("SKIP_GIF")
+COFFEE_GIF = os.getenv("COFFEE_GIF")
 # Папка с локальными картинками
 IMAGES_FOLDER = "images"
 
@@ -51,7 +52,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 intents = discord.Intents.default()
 intents.message_content = True
 
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='*', intents=intents)
 
 @bot.event
 async def on_ready():
@@ -165,7 +166,15 @@ async def image(ctx):
     # Отправляем файл
     await ctx.send(file=discord.File(random_image_path))
 
+@bot.command()
+async def Кофе(ctx):
+    """Готовит кофе"""
+    await ctx.send(f"Окей, приготовлю {COFFEE_GIF}")
+
+
 # Реакция на гифку
+REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🎉', '🤔', '👀', '🔥', '🥳', '💯']
+
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
@@ -179,7 +188,7 @@ async def on_message(message):
         else:
             await message.channel.send("Нет доступных картинок.")
 
-    # Отладка: выводим информацию о каждом embed'е (для настройки)
+    # Отладка embed'ов (если нужна)
     if message.embeds:
         print(f"Найдено {len(message.embeds)} embed'ов в сообщении от {message.author}:")
         for i, embed in enumerate(message.embeds):
@@ -208,7 +217,6 @@ async def on_message(message):
                 await message.channel.send("Нет доступных картинок.")
             break
         if embed.provider and embed.provider.name == "Tenor":
-            # Здесь можно добавить дополнительные проверки (например, title)
             if IMAGE_FILES:
                 random_image_path = random.choice(IMAGE_FILES)
                 await message.channel.send(file=discord.File(random_image_path))
@@ -216,6 +224,18 @@ async def on_message(message):
                 await message.channel.send("Нет доступных картинок.")
             break
 
+    # Выбираем случайное эмодзи из списка
+    reaction = random.choice(REACTIONS)
+    try:
+        await message.add_reaction(reaction)
+        print(f"Поставил реакцию {reaction} на сообщение от {message.author}")
+    except discord.Forbidden:
+        print("Нет прав на добавление реакций в этом канале.")
+    except discord.HTTPException as e:
+        print(f"Ошибка при добавлении реакции: {e}")
+    # ===============================================
+
+    # Обязательно для обработки команд
     await bot.process_commands(message)
 
 bot.run(BOT_TOKEN)
