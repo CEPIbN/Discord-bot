@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  discord-bot:
+    build: .
+    container_name: discord-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - TARGET_GIF_URL=${TARGET_GIF_URL:-}
+      - SKIP_GIF=${SKIP_GIF:-}
+    volumes:
+      # Монтируем папку с картинками,
+      - ./images:/app/images:ro
+      # Монтируем папку логов, если нужно
+      - ./logs:/app/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
