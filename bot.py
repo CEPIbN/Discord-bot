@@ -9,10 +9,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ===== НАСТРОЙКИ =====
-#Ссылки на гифки
+# Ссылки на гифки
 TARGET_GIF_URL = os.getenv("TARGET_GIF_URL")
 SKIP_GIF = os.getenv("SKIP_GIF")
 COFFEE_GIF = os.getenv("COFFEE_GIF")
+
 # Папка с локальными картинками
 IMAGES_FOLDER = "images"
 
@@ -54,10 +55,54 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix='*', intents=intents)
 
+# ===== НАСТРОЙКИ ДЛЯ СЛУЧАЙНОГО ПИНГА =====
+TARGET_USER_ID = os.getenv("TARGET_USER_ID")
+TARGET_CHANNEL_ID = os.getenv("TARGET_CHANNEL_ID")
+MIN_INTERVAL = int(os.getenv("MIN_INTERVAL"))
+MAX_INTERVAL = int(os.getenv("MAX_INTERVAL")) 
+
+ping_task_started = False
+
+async def random_ping_loop():
+    """Фоновая задача: ждёт случайное время и пинает пользователя."""
+    await bot.wait_until_ready()
+    if not TARGET_USER_ID or not TARGET_CHANNEL_ID:
+        print("Не заданы TARGET_USER_ID или TARGET_CHANNEL_ID. Фоновый пинг отключён.")
+        return
+    try:
+        target_user_id = int(TARGET_USER_ID)
+        target_channel_id = int(TARGET_CHANNEL_ID)
+    except ValueError:
+        print("Ошибка: TARGET_USER_ID и TARGET_CHANNEL_ID должны быть целыми числами.")
+        return
+
+    while not bot.is_closed():
+        delay = random.randint(MIN_INTERVAL, MAX_INTERVAL)
+        print(f"Следующий пинг через {delay} секунд.")
+        await asyncio.sleep(delay)
+
+        channel = bot.get_channel(target_channel_id)
+        if channel is None:
+            print(f"Канал с ID {target_channel_id} не найден. Пинг пропущен.")
+            continue
+
+        try:
+            msg = await channel.send(f"<@{target_user_id}> Привет! Случайный пинг!")
+            print(f"Отправлен пинг пользователю {target_user_id} в канал {target_channel_id}")
+            # Ждём 5 секунд
+            await asyncio.sleep(5)
+            await msg.delete()
+        except Exception as e:
+            print(f"Ошибка при отправке пинга: {e}")
+
 @bot.event
 async def on_ready():
+    global ping_task_started
     print(f'Бот {bot.user} успешно запущен!')
     print(f'Загружено {len(IMAGE_FILES)} локальных картинок.')
+    if not ping_task_started:
+        bot.loop.create_task(random_ping_loop())
+        ping_task_started = True
 
 # Вспомогательные функции для музыки
 def get_audio_url(query):
@@ -97,7 +142,6 @@ async def play_next(guild_id):
 @bot.command()
 async def play(ctx, *, query):
     """Воспроизводит музыку из YouTube"""
-    # Проверяем, находится ли пользователь в голосовом канале
     if not ctx.author.voice:
         await ctx.send("Вы должны находиться в голосовом канале!")
         return
@@ -105,22 +149,18 @@ async def play(ctx, *, query):
     channel = ctx.author.voice.channel
     guild_id = ctx.guild.id
 
-    # Подключаемся к каналу, если ещё не подключены
     if guild_id not in voice_clients or not voice_clients[guild_id].is_connected():
         voice_clients[guild_id] = await channel.connect()
 
-    # Получаем URL аудио
     url = get_audio_url(query)
     if not url:
         await ctx.send("Не удалось получить аудио. Проверьте ссылку или запрос.")
         return
 
-    # Добавляем в очередь
     if guild_id not in queues:
         queues[guild_id] = []
     queues[guild_id].append(url)
 
-    # Если ничего не играет, начинаем воспроизведение
     voice_client = voice_clients[guild_id]
     if not voice_client.is_playing():
         await play_next(guild_id)
@@ -163,14 +203,12 @@ async def image(ctx):
         await ctx.send("Нет доступных картинок в папке.")
         return
     random_image_path = random.choice(IMAGE_FILES)
-    # Отправляем файл
     await ctx.send(file=discord.File(random_image_path))
 
 @bot.command()
 async def Кофе(ctx):
     """Готовит кофе"""
     await ctx.send(f"Окей, приготовлю {COFFEE_GIF}")
-
 
 # Реакция на гифку
 REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🎉', '🤔', '👀', '🔥', '🥳', '💯']
@@ -180,7 +218,7 @@ async def on_message(message):
     if message.author == bot.user:
         return
 
-    # Проверяем текст сообщения (если ссылка отправлена как текст)
+    # Проверяем текст сообщения
     if TARGET_GIF_URL in message.content:
         if IMAGE_FILES:
             random_image_path = random.choice(IMAGE_FILES)
@@ -207,7 +245,7 @@ async def on_message(message):
                 print(f"  Provider: {embed.provider.name}")
             print("-" * 30)
 
-    # Проверяем embed'ы на наличие целевой гифки (по ID или провайдеру)
+    # Проверяем embed'ы на наличие целевой гифки
     for embed in message.embeds:
         if embed.url and "25572384" in embed.url:
             if IMAGE_FILES:
@@ -224,7 +262,7 @@ async def on_message(message):
                 await message.channel.send("Нет доступных картинок.")
             break
 
-    # Выбираем случайное эмодзи из списка
+    # Случайная реакция
     reaction = random.choice(REACTIONS)
     try:
         await message.add_reaction(reaction)
@@ -233,9 +271,7 @@ async def on_message(message):
         print("Нет прав на добавление реакций в этом канале.")
     except discord.HTTPException as e:
         print(f"Ошибка при добавлении реакции: {e}")
-    # ===============================================
 
-    # Обязательно для обработки команд
     await bot.process_commands(message)
 
 bot.run(BOT_TOKEN)
