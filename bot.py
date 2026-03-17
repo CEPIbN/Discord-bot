@@ -15,6 +15,7 @@ async def load_extensions():
     await bot.load_extension("cogs.events")
     await bot.load_extension("cogs.coffee")
     #await bot.load_extension("cogs.ping")
+    await bot.load_extension("cogs.knowledge")
 
 @bot.event
 async def setup_hook():
