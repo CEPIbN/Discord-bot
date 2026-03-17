@@ -3,6 +3,7 @@ import random
 import os
 import asyncio
 import yt_dlp
+import ollama
 from discord.ext import commands
 from dotenv import load_dotenv
 
@@ -49,6 +50,18 @@ ytdl = yt_dlp.YoutubeDL(ytdl_opts)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+# ===== ФУНКЦИЯ ДЛЯ ЧАТА С ИИ =====
+async def generate_chat_response(prompt: str, model: str = "qwen3:1.7b") -> str:
+    """Генерирует ответ на промпт с помощью Ollama."""
+    try:
+        response = ollama.chat(model=model, messages=[
+            {"role": "user", "content": prompt}
+        ])
+        return response["message"]["content"].strip()
+    except Exception as e:
+        print(f"Ошибка при генерации ответа: {e}")
+        return "Извините, произошла ошибка при генерации ответа."
+
 # Настраиваем интенты
 intents = discord.Intents.default()
 intents.message_content = True
@@ -87,10 +100,10 @@ async def random_ping_loop():
             continue
 
         try:
-            msg = await channel.send(f"<@{target_user_id}> Привет! Случайный пинг!")
+            msg = await channel.send(f"<@{target_user_id}> https://tenor.com/view/markiplier-markiplier-soyjak-soyjak-wojak-bouncing-gif-27376523")
             print(f"Отправлен пинг пользователю {target_user_id} в канал {target_channel_id}")
             # Ждём 5 секунд
-            await asyncio.sleep(5)
+            await asyncio.sleep(1)
             await msg.delete()
         except Exception as e:
             print(f"Ошибка при отправке пинга: {e}")
@@ -210,6 +223,20 @@ async def Кофе(ctx):
     """Готовит кофе"""
     await ctx.send(f"Окей, приготовлю {COFFEE_GIF}")
 
+@bot.command(name="чат", aliases=["chat"])
+async def chat(ctx, *, message: str):
+    """Ведёт диалог с ИИ через Ollama"""
+    # Отправляем сообщение о том, что бот думает
+    thinking_msg = await ctx.send("🤔 Думаю...")
+    try:
+        response = await generate_chat_response(message)
+        # Обрезаем ответ если слишком длинный (ограничение Discord 2000 символов)
+        if len(response) > 1990:
+            response = response[:1990] + "..."
+        await thinking_msg.edit(content=response)
+    except Exception as e:
+        await thinking_msg.edit(content=f"Ошибка: {e}")
+
 # Реакция на гифку
 REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🎉', '🤔', '👀', '🔥', '🥳', '💯']
 
@@ -254,7 +281,7 @@ async def on_message(message):
             else:
                 await message.channel.send("Нет доступных картинок.")
             break
-        if embed.provider and embed.provider.name == "Tenor":
+        if embed.provider and embed.provider.url == "https://tenor.com/view/%D1%81%D0%BA%D0%B8%D0%BD%D1%8C-%D0%B6%D0%BE%D0%BF%D1%83-%D1%81%D0%BA%D0%B8%D0%BD%D1%8C%D0%B6%D0%BE%D0%BF%D1%83-gif-25572384":
             if IMAGE_FILES:
                 random_image_path = random.choice(IMAGE_FILES)
                 await message.channel.send(file=discord.File(random_image_path))
